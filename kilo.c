@@ -43,7 +43,6 @@ void disableRawMode()
 }
 
 void enableRawMode()
-
 {
 	if( tcgetattr(STDIN_FILENO, &E.orig_termios) == -1 ) die("tcgetattr in enableRawMode()") ;
 
