@@ -1,7 +1,12 @@
 /***includes***/
 
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
+
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +17,8 @@
 /***defines***/
 
 #define CTRL_KEY(k)	((k) & 0x1f)
+#define KILO_VERSION	"0.0.1"
+#define WELCOME_MSG	"Welcome to the yet to be amazing Kilo Text editor -- This is version " KILO_VERSION
 
 enum editorKey {
 	DELETE_KEY = 999,
@@ -185,6 +192,30 @@ int getWindowSize(int* rows, int* cols)
 	}
 }
 
+/***file i/o***/
+
+void editorOpen(char *filename)
+{
+	FILE *fp = fopen(filename, "r");
+	if (!fp) die("Failed to open file");
+
+	char *line = NULL;
+	size_t linecap = 0;
+	ssize_t linelen;
+	
+	linelen = getline(&line, &linecap, fp);
+	if (linelen != -1)
+	{
+		E.row.size = linelen;
+		E.row.chars = malloc(linelen + 1);
+		memcpy(E.row.chars, line, linelen);
+		E.row.chars[linelen] = '\0';
+		E.numrows = 1;	
+	}
+	free(line);
+	fclose(fp);
+}
+
 /***append buffer***/
 
 struct abuf {
@@ -266,9 +297,29 @@ void editorProcessKeypress()
 void editorDrawRows(struct abuf *ab)
 {
 	int y;
-	for (y = 0; y < E.screenrows - 1; y++) 
-		abAppend(ab, "~\r\n", 3);
-	abAppend(ab, "~", 1);
+	for (y = 0; y < E.screenrows; y++) 
+	{
+		if (!E.numrows && y == E.screenrows / 3)
+		{
+			char welcome[] = WELCOME_MSG;
+			int padding = (E.screencols - sizeof(welcome)) / 2;
+			abAppend(ab, "~", 1);
+			padding--;
+			while (padding--)
+				abAppend(ab, " ", 1);
+			abAppend(ab, welcome, sizeof(welcome));
+		}
+		else if (y < E.numrows)
+		{
+			abAppend(ab, E.row.chars, E.row.size < E.screencols ? E.row.size : E.screencols);
+		}
+		else
+		{
+			abAppend(ab, "~", 1);
+		}
+		if (y < E.screenrows - 1)
+			abAppend(ab, "\r\n", 2);
+	}
 }	
 
 void editorRefreshScreen()
@@ -300,11 +351,12 @@ void initEditor()
 		die("getWindowSize");
 }
 
-int main()
+int main(int argc, char **argv)
 {
 	enableRawMode();
 	initEditor();
-	//editorOpen();
+	if (argc == 2)
+		editorOpen(argv[1]);
 
 	while(1)
 	{
