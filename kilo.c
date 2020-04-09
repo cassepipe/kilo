@@ -42,6 +42,7 @@ struct erow {
 struct editorConfig {
 	int screenrows;
 	int screencols;
+	int rowoff;
 	int cx;
 	int cy;
 	int numrows;
@@ -193,12 +194,12 @@ int getWindowSize(int* rows, int* cols)
 	}
 }
 
-/***file i/o***/
+/***row operations***/
 
 void editorAppendRow(char *s, size_t len)
 {
 	E.row = realloc(E.row, sizeof(struct erow) * (E.numrows + 1));
-	
+
 	int at = E.numrows;
 	E.row[at].size = len;
 	E.row[at].chars = malloc(len + 1);
@@ -206,6 +207,8 @@ void editorAppendRow(char *s, size_t len)
 	E.row[at].chars[len] = '\0';
 	E.numrows++;
 }
+
+/***file i/o***/
 
 void editorOpen(char *filename)
 {
@@ -215,38 +218,16 @@ void editorOpen(char *filename)
 	char *line = NULL;
 	size_t linecap = 0;
 	ssize_t linelen;
-	
-	while ((linelen = getline(&line, &linecap, fp)) != 1)  //linecap is passed by address because getline updates it.
+
+	while ((linelen = getline(&line, &linecap, fp)) != -1)  //linecap is passed by address because getline updates it.
 	{
-		if (linelen != -1)
-		{
-			//while (linelen > 0 && (line[linelen - 1] == '\r' || line[linelen - 1] == '\n'))
-			//	linelen--;
-			editorAppendRow(line, linelen);
-		}
+		while (linelen > 0 && (line[linelen - 1] == '\r' || line[linelen - 1] == '\n'))
+			linelen--;
+		editorAppendRow(line, linelen);
 	}
 	free(line);
 	fclose(fp);
 }
-//
-//
-//void editorOpen(char *filename) {
-//  FILE *fp = fopen(filename, "r");
-//  if (!fp) die("fopen");
-//  char *line = NULL;
-//  size_t linecap = 0;
-//  ssize_t linelen;
-//  while ((linelen = getline(&line, &linecap, fp)) != -1) {
-//    while (linelen > 0 && (line[linelen - 1] == '\n' ||
-//                           line[linelen - 1] == '\r'))
-//      linelen--;
-//    editorAppendRow(line, linelen);
-//  }
-//  free(line);
-//  fclose(fp);
-//}
-
-
 
 /***append buffer***/
 
@@ -315,12 +296,12 @@ void editorProcessKeypress()
 			break;
 		case PAGE_UP:
 		case PAGE_DOWN:
-		{
-			int times = E.screenrows;
-			while (times--)
-				editorMoveCursor(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
-			break;
-		}
+			{
+				int times = E.screenrows;
+				while (times--)
+					editorMoveCursor(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
+				break;
+			}
 	}
 }
 
@@ -329,7 +310,7 @@ void editorProcessKeypress()
 void editorDrawRows(struct abuf *ab)
 {
 	int y;
-	for (y = 0; y < E.screenrows; y++) 
+	for (y = E.rowoff; y < E.screenrows + E.rowoff; y++) 
 	{
 		if (y < E.numrows)
 		{
@@ -359,7 +340,7 @@ void editorRefreshScreen()
 {
 	struct abuf ab = {NULL, 0};
 
-//	abAppend(&ab, "\x1b[2J", 4);		//Wipe all lines to right of cursor (moves cursor)
+	//	abAppend(&ab, "\x1b[2J", 4);		//Wipe all lines to right of cursor (moves cursor)
 	abAppend(&ab, "\x1b[H", 3);		//Put the cursor at origin
 
 	editorDrawRows(&ab);
@@ -378,6 +359,7 @@ void initEditor()
 {
 	E.cx = 0;
 	E.cy = 0;
+	E.rowoff = 0;
 	E.numrows = 0;
 	E.row = NULL;
 
