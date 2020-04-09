@@ -228,6 +228,25 @@ void editorOpen(char *filename)
 	free(line);
 	fclose(fp);
 }
+//
+//
+//void editorOpen(char *filename) {
+//  FILE *fp = fopen(filename, "r");
+//  if (!fp) die("fopen");
+//  char *line = NULL;
+//  size_t linecap = 0;
+//  ssize_t linelen;
+//  while ((linelen = getline(&line, &linecap, fp)) != -1) {
+//    while (linelen > 0 && (line[linelen - 1] == '\n' ||
+//                           line[linelen - 1] == '\r'))
+//      linelen--;
+//    editorAppendRow(line, linelen);
+//  }
+//  free(line);
+//  fclose(fp);
+//}
+
+
 
 /***append buffer***/
 
@@ -329,7 +348,7 @@ void editorDrawRows(struct abuf *ab)
 				abAppend(ab, " ", 1);
 			abAppend(ab, welcome, sizeof(welcome));
 		}
-		//abAppend(ab, "\x1b[K", 3);
+		abAppend(ab, "\x1b[K", 3);
 		if (y < E.screenrows - 1)
 			abAppend(ab, "\r\n", 2);
 	}
