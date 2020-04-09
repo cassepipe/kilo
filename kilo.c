@@ -45,9 +45,10 @@ struct editorConfig {
 	int cx;
 	int cy;
 	int numrows;
-	struct erow row;
+	struct erow *row;
 	struct termios orig_termios;
 };
+
 
 struct editorConfig E ;
 
@@ -194,6 +195,18 @@ int getWindowSize(int* rows, int* cols)
 
 /***file i/o***/
 
+void editorAppendRow(char *s, size_t len)
+{
+	E.row = realloc(E.row, sizeof(struct erow) * (E.numrows + 1));
+	
+	int at = E.numrows;
+	E.row[at].size = len;
+	E.row[at].chars = malloc(len + 1);
+	memcpy(E.row[at].chars, s, len);
+	E.row[at].chars[len] = '\0';
+	E.numrows++;
+}
+
 void editorOpen(char *filename)
 {
 	FILE *fp = fopen(filename, "r");
@@ -203,14 +216,14 @@ void editorOpen(char *filename)
 	size_t linecap = 0;
 	ssize_t linelen;
 	
-	linelen = getline(&line, &linecap, fp);
-	if (linelen != -1)
+	while ((linelen = getline(&line, &linecap, fp)) != 1)  //linecap is passed by address because getline updates it.
 	{
-		E.row.size = linelen;
-		E.row.chars = malloc(linelen + 1);
-		memcpy(E.row.chars, line, linelen);
-		E.row.chars[linelen] = '\0';
-		E.numrows = 1;	
+		if (linelen != -1)
+		{
+			//while (linelen > 0 && (line[linelen - 1] == '\r' || line[linelen - 1] == '\n'))
+			//	linelen--;
+			editorAppendRow(line, linelen);
+		}
 	}
 	free(line);
 	fclose(fp);
@@ -299,34 +312,35 @@ void editorDrawRows(struct abuf *ab)
 	int y;
 	for (y = 0; y < E.screenrows; y++) 
 	{
-		if (!E.numrows && y == E.screenrows / 3)
+		if (y < E.numrows)
+		{
+			abAppend(ab, E.row[y].chars, E.row[y].size); // E.screencols ? E.row[y].size : E.screencols);
+		}
+		else
+		{	
+			abAppend(ab, "~", 1);
+		}
+		if (E.numrows == 0 && y == E.screenrows / 3)
 		{
 			char welcome[] = WELCOME_MSG;
 			int padding = (E.screencols - sizeof(welcome)) / 2;
-			abAppend(ab, "~", 1);
 			padding--;
 			while (padding--)
 				abAppend(ab, " ", 1);
 			abAppend(ab, welcome, sizeof(welcome));
 		}
-		else if (y < E.numrows)
-		{
-			abAppend(ab, E.row.chars, E.row.size < E.screencols ? E.row.size : E.screencols);
-		}
-		else
-		{
-			abAppend(ab, "~", 1);
-		}
+		//abAppend(ab, "\x1b[K", 3);
 		if (y < E.screenrows - 1)
 			abAppend(ab, "\r\n", 2);
 	}
 }	
 
+
 void editorRefreshScreen()
 {
 	struct abuf ab = {NULL, 0};
 
-	abAppend(&ab, "\x1b[2J", 4);		//Wipe all lines to right of cursor (moves cursor)
+//	abAppend(&ab, "\x1b[2J", 4);		//Wipe all lines to right of cursor (moves cursor)
 	abAppend(&ab, "\x1b[H", 3);		//Put the cursor at origin
 
 	editorDrawRows(&ab);
@@ -346,6 +360,7 @@ void initEditor()
 	E.cx = 0;
 	E.cy = 0;
 	E.numrows = 0;
+	E.row = NULL;
 
 	if(getWindowSize(&E.screenrows, &E.screencols) == -1)
 		die("getWindowSize");
