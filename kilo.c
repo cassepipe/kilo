@@ -43,6 +43,7 @@ struct editorConfig {
 	int screenrows;
 	int screencols;
 	int rowoff;
+	int coloff;
 	int cx;
 	int cy;
 	int numrows;
@@ -251,12 +252,16 @@ void editorMoveCursor(int key)
 	switch (key)
 	{
 		case ARROW_UP:
-			if (E.cy > 0) 
+			if (E.cy) 
 				E.cy--;
+			if (E.rowoff && !E.cy)
+				E.rowoff--;
 			break;
 		case ARROW_DOWN:
 			if (E.cy < E.screenrows - 1)
 				E.cy++;
+			else if (E.rowoff + E.screenrows - 1 < E.numrows)   // Or if (E.rowoff == E.numrows - E.screecols && E.cy == E.screecols)
+				E.rowoff++;
 			break;
 		case ARROW_RIGHT:
 			if (E.cx < E.screencols - 1)
@@ -281,6 +286,7 @@ void editorProcessKeypress()
 
 	switch (c) 
 	{	
+		case CTRL_KEY('c'):
 		case CTRL_KEY('q'):
 			write(STDOUT_FILENO, "\x1b[2J", 4);
 			write(STDOUT_FILENO, "\x1b[H", 3);
@@ -314,7 +320,7 @@ void editorDrawRows(struct abuf *ab)
 	{
 		if (y < E.numrows)
 		{
-			abAppend(ab, E.row[y].chars, E.row[y].size); // E.screencols ? E.row[y].size : E.screencols);
+			abAppend(ab, E.row[y].chars[coloff], E.row[y].size < E.screencols ? E.row[y].size : E.screencols);
 		}
 		else
 		{	
@@ -329,8 +335,8 @@ void editorDrawRows(struct abuf *ab)
 				abAppend(ab, " ", 1);
 			abAppend(ab, welcome, sizeof(welcome));
 		}
-		abAppend(ab, "\x1b[K", 3);
-		if (y < E.screenrows - 1)
+		//abAppend(ab, "\x1b[K", 3);		//Does not work very well 
+		if (y < E.screenrows - 1 + E.rowoff)
 			abAppend(ab, "\r\n", 2);
 	}
 }	
@@ -340,7 +346,7 @@ void editorRefreshScreen()
 {
 	struct abuf ab = {NULL, 0};
 
-	//	abAppend(&ab, "\x1b[2J", 4);		//Wipe all lines to right of cursor (moves cursor)
+	abAppend(&ab, "\x1b[2J", 4);		//Wipe all lines to right of cursor (moves cursor)
 	abAppend(&ab, "\x1b[H", 3);		//Put the cursor at origin
 
 	editorDrawRows(&ab);
@@ -360,6 +366,7 @@ void initEditor()
 	E.cx = 0;
 	E.cy = 0;
 	E.rowoff = 0;
+	E.coloff = 0;
 	E.numrows = 0;
 	E.row = NULL;
 
