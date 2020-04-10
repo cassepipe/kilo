@@ -254,22 +254,26 @@ void editorMoveCursor(int key)
 		case ARROW_UP:
 			if (E.cy) 
 				E.cy--;
-			if (E.rowoff && !E.cy)
+			else if (E.rowoff)
 				E.rowoff--;
 			break;
 		case ARROW_DOWN:
 			if (E.cy < E.screenrows - 1)
 				E.cy++;
-			else if (E.rowoff + E.screenrows - 1 < E.numrows)   // Or if (E.rowoff == E.numrows - E.screecols && E.cy == E.screecols)
+			else if (E.rowoff + E.screenrows - 1 < E.numrows)
 				E.rowoff++;
 			break;
 		case ARROW_RIGHT:
 			if (E.cx < E.screencols - 1)
 				E.cx++;
+			else
+				E.coloff++;
 			break;
 		case ARROW_LEFT:
-			if (E.cx > 0)
+			if (E.cx)
 				E.cx--;
+			else if (E.coloff)
+				E.coloff--;
 			break;
 		case HOME_KEY:
 			E.cx = 0;
@@ -288,6 +292,7 @@ void editorProcessKeypress()
 	{	
 		case CTRL_KEY('c'):
 		case CTRL_KEY('q'):
+		case CTRL_KEY('w'):
 			write(STDOUT_FILENO, "\x1b[2J", 4);
 			write(STDOUT_FILENO, "\x1b[H", 3);
 			exit(0) ;
@@ -320,7 +325,11 @@ void editorDrawRows(struct abuf *ab)
 	{
 		if (y < E.numrows)
 		{
-			abAppend(ab, E.row[y].chars[coloff], E.row[y].size < E.screencols ? E.row[y].size : E.screencols);
+			int linelen =  E.row[y].size - E.coloff;
+			if (linelen > E.screencols) 
+				linelen =  E.screencols;
+			if (E.coloff < E.row[y].size)					//Let's avoid segfaults
+				abAppend(ab, &E.row[y].chars[E.coloff], linelen);
 		}
 		else
 		{	
